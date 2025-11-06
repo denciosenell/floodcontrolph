@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 # === File Settings ===
 DOM_FILE = "resources/all_national_data.txt"
-MAP_FILE = "output/national_map_colored_legend_checkboxes.html"
+MAP_FILE = "output/index.html"
 EXCEL_FILE = "output/national_projects_data.xlsx"
 
 # === Function to extract coordinates from location string ===
