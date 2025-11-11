@@ -96,33 +96,82 @@ groups = {
     "50M–100M": folium.FeatureGroup(name="50M–100M"),
     "100M–200M": folium.FeatureGroup(name="100M–200M"),
     "200M+": folium.FeatureGroup(name="200M+"),
+    "QM CORP": folium.FeatureGroup(name="QM CORP"),
+    "ZALDY CO": folium.FeatureGroup(name="ZALDY CO"),
+    "DISCAYA": folium.FeatureGroup(name="DISCAYA"),
+    "LEGACY": folium.FeatureGroup(name="LEGACY"),
+
 }
 
 # === Add pins to feature groups ===
+# Keywords to check for black outline
+QM_CORP = ["QM BUILDER", "QUIRANTE", "QG", "Adamant"]
+CO_CORP = ["SUNWEST", "HI-TONE"]
+DISCAYA = ["ST. TIMOTHY", "ST. GERRARD", "ALPHA & OMEGA", "ST. MATTHEW"]
+LEGACY = ["LEGACY CONSTRUCTION"]
 for idx, row in df.iterrows():
     cost = row["Cost"]
-    contractor = row["Contractor"]
+    contractor = row["Contractor"].upper()  # Make comparison case-insensitive
     color = get_color(cost)
-    #popup_html = f"<b>{row['Title']}</b><br>Cost: ₱{cost:,.0f}"
+
+    # Check if contractor name starts with any of the keywords
+    if any(contractor.startswith(keyword) for keyword in QM_CORP):
+        border_color = "black"
+        border_weight = 2
+    elif any(contractor.startswith(keyword) for keyword in CO_CORP):
+        border_color = "blue"
+        border_weight = 2
+    elif any(contractor.startswith(keyword) for keyword in DISCAYA):
+        border_color = "red"
+        border_weight = 2
+    elif any(contractor.startswith(keyword) for keyword in LEGACY):
+        border_color = "green"
+        border_weight = 2
+    else:
+        border_color = color
+        border_weight = 1  # default thin border
 
     popup_html = f"""
     <b>{row['Title']}</b><br>
-    Contractor: {contractor}<br>
-    Start Date: {row['Start Date']} Cost: <span style="color:red; font-size:14px; font-weight:bold;">₱{cost:,.0f}</span>
+    Contractor: {row['Contractor']}<br>
+    Start Date: {row['Start Date']}<br>
+    Cost: <span style="color:red; font-size:14px; font-weight:bold;">₱{cost:,.0f}</span><br>
+    <a href='https://www.google.com/maps?q={row['Latitude']},{row['Longitude']}'
+       target='_blank' style="color:#1a73e8; text-decoration:none; font-weight:bold;">
+       📍 View on Google Maps
+    </a>
     """
 
     marker = folium.CircleMarker(
         location=[row["Latitude"], row["Longitude"]],
         radius=8,
-        color=color,
+        color=border_color,  # border color
+        weight=border_weight,  # border thickness
         fill=True,
         fill_color=color,
         fill_opacity=0.7,
-        tooltip=f"₱{cost:,.0f}"
-    ).add_child(folium.Popup(popup_html, max_width=300))
+        tooltip=folium.Tooltip(
+            f"<div style='text-align:center; max-width:600px; white-space: normal;'>"
+            f"<span style='color:red; font-weight:bold; font-size:14px;'>₱{cost:,.0f}</span><br>"
+            f"<span style='font-size:10px;'>{row['Contractor'][:21]}</span><br>"
+            f"<span style='font-size:10px;'>{row['Start Date']}</span>"
+            f"</div>",
+
+            sticky=True
+        ),
+        popup=folium.Popup(popup_html, max_width=600)
+    )
 
     # Assign marker to proper group
-    if cost < 50_000_000:
+    if any(contractor.startswith(keyword) for keyword in QM_CORP):
+        groups["QM CORP"].add_child(marker)
+    elif any(contractor.startswith(keyword) for keyword in CO_CORP):
+        groups["ZALDY CO"].add_child(marker)
+    elif any(contractor.startswith(keyword) for keyword in DISCAYA):
+        groups["DISCAYA"].add_child(marker)
+    elif any(contractor.startswith(keyword) for keyword in LEGACY):
+        groups["LEGACY"].add_child(marker)
+    elif cost < 50_000_000:
         groups["<50M"].add_child(marker)
     elif 50_000_000 <= cost < 100_000_000:
         groups["50M–100M"].add_child(marker)
@@ -131,6 +180,7 @@ for idx, row in df.iterrows():
     elif cost >= 200_000_000:
         groups["200M+"].add_child(marker)
 
+
 # Add all feature groups to map
 for group in groups.values():
     group.add_to(project_map)
@@ -138,19 +188,45 @@ for group in groups.values():
 # === Add LayerControl for checkboxes ===
 folium.LayerControl(collapsed=False).add_to(project_map)
 
-# === Add legend ===
-legend_html = """
-<div style="position: fixed; bottom: 30px; left: 30px; width: 100px; height: 100px;
-     background-color: white; border:2px solid grey; z-index:9999; font-size:12px;
-     padding: 5px; border-radius: 5px;">
-<b> Project Cost </b><br>
-<i style="background: grey; width: 10px; height: 10px; display:inline-block; margin-right:1px;"></i> <50M<br>
-<i style="background: yellow; width: 10px; height: 10px; display:inline-block; margin-right:1x;"></i> 50M–100M<br>
-<i style="background: orange; width: 10px; height: 10px; display:inline-block; margin-right:1px;"></i> 100M–200M<br>
-<i style="background: red; width: 10px; height: 10px; display:inline-block; margin-right:1px;"></i> 200M up<br>
-</div>
+# === Colored squares beside each checkbox ===
+style_js = """
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const layerItems = document.querySelectorAll('.leaflet-control-layers-selector');
+
+    layerItems.forEach(function(item) {
+        const label = item.nextSibling;  // text node after checkbox
+        if (!label) return;
+        const name = label.textContent.trim();
+
+        // Create color square
+        const colorBox = document.createElement('span');
+        colorBox.style.display = 'inline-block';
+        colorBox.style.width = '12px';
+        colorBox.style.height = '12px';
+        colorBox.style.marginLeft = '6px';
+        colorBox.style.marginRight = '3px';
+        colorBox.style.border = '1px solid black';
+        colorBox.style.verticalAlign = 'middle';
+
+        // Match color depending on layer name
+        if (name.includes('<50M')) colorBox.style.background = 'grey';
+        else if (name.includes('50M')) colorBox.style.background = 'yellow';
+        else if (name.includes('100M')) colorBox.style.background = 'orange';
+        else if (name.includes('200M')) colorBox.style.background = 'red';
+        else if (name.includes('QM')) { colorBox.style.background = 'white'; colorBox.style.border = '2px solid black'; }
+        else if (name.includes('ZALDY')) { colorBox.style.background = 'white'; colorBox.style.border = '2px solid blue'; }
+        else if (name.includes('DISCAYA')) { colorBox.style.background = 'white'; colorBox.style.border = '2px solid red'; }
+        else if (name.includes('LEGACY')) { colorBox.style.background = 'white'; colorBox.style.border = '2px solid green'; }
+
+        // Insert before label text
+        label.parentNode.insertBefore(colorBox, label);
+    });
+});
+</script>
 """
-project_map.get_root().html.add_child(folium.Element(legend_html))
+
+project_map.get_root().html.add_child(folium.Element(style_js))
 
 # tooltip size
 style_html = """
@@ -163,6 +239,7 @@ style_html = """
 </style>
 """
 project_map.get_root().html.add_child(folium.Element(style_html))
+
 
 # TITLE
 title_html = """
@@ -184,6 +261,7 @@ title_html = """
 </div>
 """
 project_map.get_root().html.add_child(folium.Element(title_html))
+
 # === Save map ===
 project_map.save(MAP_FILE)
 print(f"✅ Map with colored pins and checkboxes saved as '{MAP_FILE}'")
