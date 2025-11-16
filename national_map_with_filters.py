@@ -115,16 +115,16 @@ for idx, row in df.iterrows():
     color = get_color(cost)
 
     # Check if contractor name starts with any of the keywords
-    if any(contractor.startswith(keyword) for keyword in QM_CORP):
+    if any(keyword in contractor for keyword in QM_CORP):
         border_color = "black"
         border_weight = 2
-    elif any(contractor.startswith(keyword) for keyword in CO_CORP):
+    elif any(keyword in contractor for keyword in CO_CORP):
         border_color = "blue"
         border_weight = 2
-    elif any(contractor.startswith(keyword) for keyword in DISCAYA):
+    elif any(keyword in contractor for keyword in DISCAYA):
         border_color = "red"
         border_weight = 2
-    elif any(contractor.startswith(keyword) for keyword in LEGACY):
+    elif any(keyword in contractor for keyword in LEGACY):
         border_color = "green"
         border_weight = 2
     else:
